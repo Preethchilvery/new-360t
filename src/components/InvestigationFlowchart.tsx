@@ -292,6 +292,10 @@ const InvestigationFlowchart: React.FC = () => {
   const [showPathView, setShowPathView] = useState(false);
   const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
   const [showAddNode, setShowAddNode] = useState(false);
+  const [endNote, setEndNote] = useState('');
+  const [manualResult, setManualResult] = useState('');
+  const [showEndModal, setShowEndModal] = useState(false);
+  const [manuallyEnded, setManuallyEnded] = useState(false);
 
   // Load data from memory on component mount
   useEffect(() => {
@@ -443,9 +447,24 @@ const InvestigationFlowchart: React.FC = () => {
       return `Step ${stepNumber}:\nQuestion: ${question}\nSelected: ${selections}\n`;
     }).join('\n');
 
-    // Add timestamp and header
+    // Calculate time spent
+    let timeSpent = 0;
+    if (userPath.length > 1) {
+      const start = new Date(userPath[0].timestamp).getTime();
+      const end = new Date(userPath[userPath.length - 1].timestamp).getTime();
+      timeSpent = Math.round((end - start) / 1000); // in seconds
+    }
+
+    // Get the final result message
+    const lastStep = userPath[userPath.length - 1];
+    const resultNode = flowchart.nodes.find(node => node.id === lastStep.nodeId);
+    const resultMessage = resultNode?.endpointMessage || 'Trade investigation process complete!';
+
+    // Add timestamp, summary, and result
     const timestamp = new Date().toLocaleString();
-    const exportContent = `Trade Investigation Path\nGenerated on: ${timestamp}\n\n${pathText}`;
+    const exportContent = 
+      `Trade Investigation Path\nGenerated on: ${timestamp}\n\n${pathText}\n\n` +
+      `---\nResult: ${manualResult || resultMessage}\nNote: ${endNote}\nTime spent on this trade: ${timeSpent} seconds\n`;
 
     // Create and download the text file
     const blob = new Blob([exportContent], { type: 'text/plain' });
@@ -817,6 +836,97 @@ const InvestigationFlowchart: React.FC = () => {
     }
 
     if (currentNode.isEndpoint) {
+      if (manuallyEnded) {
+        // Calculate time spent
+        let timeSpent = 0;
+        if (userPath.length > 1) {
+          const start = new Date(userPath[0].timestamp).getTime();
+          const end = new Date(userPath[userPath.length - 1].timestamp).getTime();
+          timeSpent = Math.round((end - start) / 1000); // in seconds
+        }
+
+        return (
+          <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center p-4 overflow-auto">
+            <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8 text-center">
+              <div className="mb-6">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <span className="text-2xl">🎯</span>
+                </div>
+                <h2 className="text-2xl font-bold text-gray-800 mb-4">Investigation Result</h2>
+                <div className="text-gray-700 text-lg leading-relaxed mb-2">
+                  <span className="font-bold">Result:</span> {manualResult || 'Ended'}
+                </div>
+                {endNote && (
+                  <div className="text-gray-700 text-base leading-relaxed mb-2">
+                    <span className="font-bold">Note:</span> {endNote}
+                  </div>
+                )}
+              </div>
+
+              {userPath.length > 0 && (
+                <div className="mb-6 p-4 bg-gray-50 rounded-lg overflow-y-auto max-h-60">
+                  <h3 className="font-medium text-gray-800 mb-2">Your Investigation Path:</h3>
+                  <div className="text-sm text-gray-600 space-y-1">
+                    {userPath.map((step, index) => (
+                      <div key={index} className="flex items-center justify-between">
+                        <span className="truncate">{step.question}</span>
+                        <span className="font-medium ml-2">{step.selectedTexts.join(', ')}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="text-gray-700 text-base leading-relaxed mb-4">
+                <span className="font-bold">Time spent:</span> {timeSpent} seconds
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setCurrentNodeId(flowchart.startNodeId);
+                    setUserPath([]);
+                    setManuallyEnded(false);
+                    setEndNote('');
+                    setManualResult('');
+                  }}
+                  className="flex-1 bg-blue-500 text-white px-4 py-3 rounded-lg hover:bg-blue-600 transition-colors flex items-center justify-center"
+                >
+                  <RotateCcw className="w-4 h-4 mr-2" />
+                  Start Over
+                </button>
+                <button
+                  onClick={showPathVisualization}
+                  className="flex-1 bg-purple-500 text-white px-4 py-3 rounded-lg hover:bg-purple-600 transition-colors flex items-center justify-center"
+                >
+                  <Eye className="w-4 h-4 mr-2" />
+                  View Path
+                </button>
+                <button
+                  onClick={exportPath}
+                  className="flex-1 bg-green-500 text-white px-4 py-3 rounded-lg hover:bg-green-600 transition-colors flex items-center justify-center"
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Export Investigation
+                </button>
+              </div>
+              
+              <button
+                onClick={() => {
+                  setManuallyEnded(false);
+                  setEndNote('');
+                  setManualResult('');
+                  resetFlow();
+                }}
+                className="w-full mt-3 bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors"
+              >
+                Back to Admin
+              </button>
+            </div>
+          </div>
+        );
+      }
+
       return (
         <div className="h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-blue-50 p-4">
           <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8 text-center">
@@ -1015,6 +1125,58 @@ const InvestigationFlowchart: React.FC = () => {
                     )}
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* End Investigation Button */}
+          <button
+            onClick={() => setShowEndModal(true)}
+            className="w-full bg-red-500 text-white px-4 py-2 rounded-lg mt-4 hover:bg-red-600 transition-colors"
+          >
+            End Investigation
+          </button>
+
+          {/* End Investigation Modal */}
+          {showEndModal && (
+            <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+              <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
+                <h2 className="text-lg font-bold mb-2">End Investigation</h2>
+                <textarea
+                  className="w-full border p-2 rounded mb-2"
+                  placeholder="Add a note (optional)..."
+                  value={endNote}
+                  onChange={e => setEndNote(e.target.value)}
+                />
+                <select
+                  className="w-full border p-2 rounded mb-2"
+                  value={manualResult}
+                  onChange={e => setManualResult(e.target.value)}
+                >
+                  <option value="">Select Result</option>
+                  <option value="Paused">Paused</option>
+                  <option value="Escalated">Escalated</option>
+                  <option value="Closed - No Action">Closed - No Action</option>
+                  <option value="Other">Other</option>
+                </select>
+                <div className="flex gap-2">
+                  <button
+                    className="bg-blue-500 text-white px-4 py-2 rounded"
+                    onClick={() => {
+                      setShowEndModal(false);
+                      setCurrentNodeId(null);
+                      setManuallyEnded(true);
+                    }}
+                  >
+                    Confirm End
+                  </button>
+                  <button
+                    className="bg-gray-300 px-4 py-2 rounded"
+                    onClick={() => setShowEndModal(false)}
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
             </div>
           )}

@@ -17,6 +17,9 @@ const NodeForm: React.FC<NodeFormProps> = ({ node, onSave, onCancel }) => {
   const [question, setQuestion] = useState(node?.question || '');
   const [isEndpoint, setIsEndpoint] = useState(node?.isEndpoint || false);
   const [endpointMessage, setEndpointMessage] = useState(node?.endpointMessage || '');
+  const [selectionMode, setSelectionMode] = useState<'single' | 'multiple'>(
+    node?.selectionMode || 'single'
+  );
 
   const optionKeys = Object.keys(options);
 
@@ -48,7 +51,7 @@ const NodeForm: React.FC<NodeFormProps> = ({ node, onSave, onCancel }) => {
       options,
       isEndpoint,
       endpointMessage,
-      selectionMode: isEndpoint ? 'single' : 'multiple'
+      selectionMode: isEndpoint ? 'single' : selectionMode
     });
   };
 
@@ -77,6 +80,42 @@ const NodeForm: React.FC<NodeFormProps> = ({ node, onSave, onCancel }) => {
                   rows={3}
                   placeholder="Enter your question here..."
                 />
+              </div>
+            )}
+
+            {/* Selection Mode Toggle */}
+            {!isEndpoint && (
+              <div className="bg-purple-50 p-4 rounded-lg border border-purple-200 mb-4">
+                <label className="block text-sm font-bold mb-2 text-gray-700">Selection Mode</label>
+                <div className="flex gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setSelectionMode('single')}
+                    className={`flex-1 p-3 rounded-lg border-2 transition-colors ${
+                      selectionMode === 'single'
+                        ? 'bg-blue-500 text-white border-blue-600'
+                        : 'bg-white text-gray-700 border-gray-300 hover:border-blue-300'
+                    }`}
+                  >
+                    Single Selection
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectionMode('multiple')}
+                    className={`flex-1 p-3 rounded-lg border-2 transition-colors ${
+                      selectionMode === 'multiple'
+                        ? 'bg-purple-500 text-white border-purple-600'
+                        : 'bg-white text-gray-700 border-gray-300 hover:border-purple-300'
+                    }`}
+                  >
+                    Multiple Selection
+                  </button>
+                </div>
+                <p className="mt-2 text-sm text-gray-600">
+                  {selectionMode === 'single'
+                    ? 'Users can select only one option'
+                    : 'Users can select multiple options'}
+                </p>
               </div>
             )}
 
