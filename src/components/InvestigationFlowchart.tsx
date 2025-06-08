@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronRight, Plus, Edit, Trash2, Play, RotateCcw, Save, Download, Eye, X } from 'lucide-react';
 import NodeForm from './NodeForm';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface Option {
   text: string;
@@ -846,7 +846,13 @@ const InvestigationFlowchart: React.FC = () => {
         }
 
         return (
-          <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center p-4 overflow-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 40 }}
+            transition={{ duration: 0.4, type: 'spring' }}
+            className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center p-4 overflow-auto"
+          >
             <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8 text-center">
               <div className="mb-6">
                 <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -923,7 +929,7 @@ const InvestigationFlowchart: React.FC = () => {
                 Back to Admin
               </button>
             </div>
-          </div>
+          </motion.div>
         );
       }
 
@@ -1138,48 +1144,62 @@ const InvestigationFlowchart: React.FC = () => {
           </button>
 
           {/* End Investigation Modal */}
-          {showEndModal && (
-            <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-              <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
-                <h2 className="text-lg font-bold mb-2">End Investigation</h2>
-                <textarea
-                  className="w-full border p-2 rounded mb-2"
-                  placeholder="Add a note (optional)..."
-                  value={endNote}
-                  onChange={e => setEndNote(e.target.value)}
-                />
-                <select
-                  className="w-full border p-2 rounded mb-2"
-                  value={manualResult}
-                  onChange={e => setManualResult(e.target.value)}
+          <AnimatePresence>
+            {showEndModal && (
+              <motion.div
+                className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+              >
+                <motion.div
+                  className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md"
+                  initial={{ scale: 0.95, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.95, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
                 >
-                  <option value="">Select Result</option>
-                  <option value="Paused">Paused</option>
-                  <option value="Escalated">Escalated</option>
-                  <option value="Closed - No Action">Closed - No Action</option>
-                  <option value="Other">Other</option>
-                </select>
-                <div className="flex gap-2">
-                  <button
-                    className="bg-blue-500 text-white px-4 py-2 rounded"
-                    onClick={() => {
-                      setShowEndModal(false);
-                      setCurrentNodeId(null);
-                      setManuallyEnded(true);
-                    }}
+                  <h2 className="text-lg font-bold mb-2">End Investigation</h2>
+                  <textarea
+                    className="w-full border p-2 rounded mb-2"
+                    placeholder="Add a note (optional)..."
+                    value={endNote}
+                    onChange={e => setEndNote(e.target.value)}
+                  />
+                  <select
+                    className="w-full border p-2 rounded mb-2"
+                    value={manualResult}
+                    onChange={e => setManualResult(e.target.value)}
                   >
-                    Confirm End
-                  </button>
-                  <button
-                    className="bg-gray-300 px-4 py-2 rounded"
-                    onClick={() => setShowEndModal(false)}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
+                    <option value="">Select Result</option>
+                    <option value="Paused">Paused</option>
+                    <option value="Escalated">Escalated</option>
+                    <option value="Closed - No Action">Closed - No Action</option>
+                    <option value="Other">Other</option>
+                  </select>
+                  <div className="flex gap-2">
+                    <button
+                      className="bg-blue-500 text-white px-4 py-2 rounded"
+                      onClick={() => {
+                        setShowEndModal(false);
+                        setCurrentNodeId(null);
+                        setManuallyEnded(true);
+                      }}
+                    >
+                      Confirm End
+                    </button>
+                    <button
+                      className="bg-gray-300 px-4 py-2 rounded"
+                      onClick={() => setShowEndModal(false)}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <button
             onClick={resetFlow}
