@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronRight, Plus, Edit, Trash2, Play, RotateCcw, Save, Download, Eye, X } from 'lucide-react';
 import NodeForm from './NodeForm';
+import { motion } from 'framer-motion';
 
 interface Option {
   text: string;
@@ -384,13 +385,20 @@ const InvestigationFlowchart: React.FC = () => {
 
     if (currentNode.selectionMode === 'multiple') {
       setSelectedOptions(prev => {
-        const newSelections = prev.includes(optionKey)
-          ? prev.filter(key => key !== optionKey)
-          : [...prev, optionKey];
-        return newSelections;
+        if (prev.includes(optionKey)) {
+          return prev.filter(key => key !== optionKey);
+        } else {
+          return [...prev, optionKey];
+        }
       });
     } else {
       proceedWithSelection([optionKey]);
+    }
+  };
+
+  const confirmMultipleSelection = () => {
+    if (selectedOptions.length > 0) {
+      proceedWithSelection(selectedOptions);
     }
   };
 
@@ -425,17 +433,26 @@ const InvestigationFlowchart: React.FC = () => {
 
   // Export investigation path
   const exportPath = () => {
-    const pathData = userPath.map(step => ({
-      question: step.question,
-      selectedOptions: step.selectedTexts,
-      timestamp: step.timestamp
-    }));
+    if (userPath.length === 0) return;
 
-    const blob = new Blob([JSON.stringify(pathData, null, 2)], { type: 'application/json' });
+    // Format the path data as text
+    const pathText = userPath.map((step, index) => {
+      const stepNumber = index + 1;
+      const question = step.question;
+      const selections = step.selectedTexts ? step.selectedTexts.join(', ') : '';
+      return `Step ${stepNumber}:\nQuestion: ${question}\nSelected: ${selections}\n`;
+    }).join('\n');
+
+    // Add timestamp and header
+    const timestamp = new Date().toLocaleString();
+    const exportContent = `Trade Investigation Path\nGenerated on: ${timestamp}\n\n${pathText}`;
+
+    // Create and download the text file
+    const blob = new Blob([exportContent], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'investigation-path.json';
+    a.download = `investigation-path-${new Date().toISOString().split('T')[0]}.txt`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -665,124 +682,117 @@ const InvestigationFlowchart: React.FC = () => {
 
   // Admin Panel
   if (mode === 'admin') {
-    const handleAddNode = () => {
-      setShowNodeForm(true);
-      setEditingNode(null);
-    };
-
-    const handleEditNode = (node: Node) => {
-      setEditingNode(node);
-      setShowNodeForm(true);
-    };
-
-    const handleSaveNode = (nodeData: NodeFormData) => {
-      if (editingNode) {
-        // Update existing node
-        const updatedFlowchart: Flowchart = {
-          ...flowchart,
-          nodes: flowchart.nodes.map((node: Node) =>
-            node.id === editingNode.id ? { ...node, ...nodeData } : node
-          )
-        };
-        setFlowchart(updatedFlowchart);
-        saveFlowchart(updatedFlowchart);
-      } else {
-        // Add new node
-        const newNodeId = `node_${flowchart.nodes.length + 1}`;
-        const newNode: Node = {
-          id: newNodeId,
-          ...nodeData
-        };
-        const updatedFlowchart: Flowchart = {
-          ...flowchart,
-          nodes: [...flowchart.nodes, newNode]
-        };
-        setFlowchart(updatedFlowchart);
-        saveFlowchart(updatedFlowchart);
-      }
-      setShowNodeForm(false);
-      setEditingNode(null);
-    };
-
-    const handleCancelNodeForm = () => {
-      setShowNodeForm(false);
-      setEditingNode(null);
-    };
-
     return (
-      <>
-        <div className="min-h-screen bg-gray-100 p-4">
-          <div className="max-w-6xl mx-auto">
-            <div className="bg-white rounded-lg shadow-lg p-6">
-              <div className="flex justify-between items-center mb-6">
-                <h1 className="text-2xl font-bold text-gray-800">Trade Investigation Admin Panel</h1>
-                <div className="flex gap-4">
-                  <button
-                    onClick={handleAddNode}
-                    className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-bold"
-                  >
-                    Add New Node
-                  </button>
-                  <button
-                    onClick={() => setMode('user')}
-                    className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-bold"
-                  >
-                    Test Investigation
-                  </button>
-                </div>
-              </div>
-
-              {/* Nodes List */}
-              <div className="space-y-4">
-                {flowchart.nodes.map((node: Node) => (
-                  <div key={node.id} className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h3 className="font-bold text-lg text-gray-800">{node.question}</h3>
-                        <p className="text-sm text-gray-600 mt-1">ID: {node.id}</p>
-                        <p className="text-sm text-gray-600">Type: {node.isEndpoint ? 'ENDPOINT' : 'QUESTION'}</p>
-                      </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleEditNode(node)}
-                          className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded font-bold"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => deleteNode(node.id)}
-                          className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded font-bold"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </div>
-                    {!node.isEndpoint && (
-                      <div className="mt-3">
-                        <h4 className="font-bold text-gray-700">Options:</h4>
-                        <ul className="list-disc list-inside mt-2">
-                          {Object.entries(node.options).map(([key, option]: [string, Option]) => (
-                            <li key={key} className="text-gray-600">
-                              {option.text} → {option.nextNodeId}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
+      <div className="h-screen flex flex-col bg-gray-50">
+        <div className="flex-none sticky top-0 bg-gray-50 z-10 p-4 border-b">
+          <div className="max-w-4xl mx-auto flex justify-between items-center">
+            <h1 className="text-3xl font-bold text-gray-800">Trade Investigation Admin Panel</h1>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowAddNode(true)}
+                className="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition-colors flex items-center"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Add Node
+              </button>
+              <button
+                onClick={startUserFlow}
+                className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition-colors flex items-center"
+              >
+                <Play className="w-4 h-4 mr-2" />
+                Test Investigation
+              </button>
             </div>
           </div>
         </div>
-        {showNodeForm && (
+
+        <div className="flex-1 overflow-y-auto p-4">
+          <div className="max-w-4xl mx-auto">
+            <div className="grid gap-4 pb-8">
+              {Object.values(flowchart.nodes).map((node, idx) => (
+                <motion.div
+                  key={node.id}
+                  initial={{ opacity: 0, y: 30 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: idx * 0.05, duration: 0.4, type: 'spring' }}
+                  className="bg-white p-4 rounded-lg shadow-md border"
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-sm font-medium">
+                          {node.id}
+                        </span>
+                        {node.id === flowchart.startNodeId && (
+                          <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-sm font-medium">
+                            START
+                          </span>
+                        )}
+                        {node.isEndpoint && (
+                          <span className="bg-red-100 text-red-800 px-2 py-1 rounded text-sm font-medium">
+                            ENDPOINT
+                          </span>
+                        )}
+                      </div>
+                      {node.isEndpoint ? (
+                        <p className="text-gray-700 font-medium">{node.endpointMessage}</p>
+                      ) : (
+                        <>
+                          <p className="text-gray-700 font-medium mb-2">{node.question}</p>
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className={`px-2 py-1 rounded text-xs font-medium ${
+                              node.selectionMode === 'multiple' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
+                            }`}>
+                              {node.selectionMode === 'multiple' ? 'MULTIPLE SELECTION' : 'SINGLE SELECTION'}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              {Object.keys(node.options).length} options
+                            </span>
+                          </div>
+                          <div className="text-sm text-gray-600">
+                            {Object.entries(node.options).map(([optionKey, option], index) => (
+                              <div key={optionKey}>• {option.text} → {option.nextNodeId || 'None'}</div>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setEditingNode(node)}
+                        className="text-blue-500 hover:text-blue-700 transition-colors"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => deleteNode(node.id)}
+                        className="text-red-500 hover:text-red-700 transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {showAddNode && (
           <NodeForm
-            node={editingNode}
-            onSave={handleSaveNode}
-            onCancel={handleCancelNodeForm}
+            onSave={addNode}
+            onCancel={() => setShowAddNode(false)}
           />
         )}
-      </>
+
+        {editingNode && (
+          <NodeForm
+            node={editingNode}
+            onSave={(data) => updateNode(editingNode.id, data)}
+            onCancel={() => setEditingNode(null)}
+          />
+        )}
+      </div>
     );
   }
 
@@ -790,114 +800,233 @@ const InvestigationFlowchart: React.FC = () => {
   if (mode === 'user') {
     const currentNode = currentNodeId ? flowchart.nodes.find(node => node.id === currentNodeId) : null;
 
-    return (
-      <>
-        <div className="min-h-screen bg-gray-100 p-4">
-          <div className="max-w-4xl mx-auto">
-            <div className="bg-white rounded-lg shadow-lg p-6">
-              {/* Progress Indicator */}
-              <div className="mb-6">
-                <div className="flex items-center justify-between mb-2">
-                  <h2 className="text-xl font-bold text-gray-800">Trade Investigation Progress</h2>
-                  <span className="text-sm text-gray-600">
-                    Step {userPath.length + 1} of {flowchart.nodes.length}
-                  </span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div
-                    className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${Math.round(((userPath.length + 1) / (flowchart.nodes.length || 1)) * 100)}%` }}
-                  />
-                </div>
-              </div>
-
-              {/* Current Question */}
-              {currentNode && !currentNode.isEndpoint ? (
-                <div className="space-y-6">
-                  <h3 className="text-lg font-bold text-gray-800">{currentNode.question}</h3>
-                  <div className="space-y-3">
-                    {Object.entries(currentNode.options).map(([key, option]) => (
-                      <button
-                        key={key}
-                        onClick={() => handleChoice(key)}
-                        className={`w-full p-4 text-left rounded-lg border-2 transition-colors ${
-                          selectedOptions.includes(key)
-                            ? 'border-blue-500 bg-blue-50'
-                            : 'border-gray-200 hover:border-blue-300'
-                        }`}
-                      >
-                        {option.text}
-                      </button>
-                    ))}
-                  </div>
-                  {currentNode.selectionMode === 'multiple' && selectedOptions.length > 0 && (
-                    <button
-                      onClick={() => proceedWithSelection(selectedOptions)}
-                      className="w-full bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-bold text-lg transition-colors"
-                    >
-                      Continue with Selected Options
-                    </button>
-                  )}
-                </div>
-              ) : currentNode?.isEndpoint ? (
-                <div className="text-center py-8">
-                  <h3 className="text-2xl font-bold text-gray-800 mb-4">Investigation Complete!</h3>
-                  <p className="text-gray-600 mb-6">{currentNode.endpointMessage}</p>
-                  <div className="flex justify-center gap-4">
-                    <button
-                      onClick={() => {
-                        setShowPathView(true);
-                        setMode('admin');
-                      }}
-                      className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-bold"
-                    >
-                      View Investigation Path
-                    </button>
-                    <button
-                      onClick={() => {
-                        setCurrentNodeId(flowchart.startNodeId);
-                        setUserPath([]);
-                        setSelectedOptions([]);
-                      }}
-                      className="bg-gray-500 hover:bg-gray-600 text-white px-6 py-3 rounded-lg font-bold"
-                    >
-                      Start New Investigation
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <h3 className="text-2xl font-bold text-gray-800 mb-4">Welcome to Trade Investigation</h3>
-                  <p className="text-gray-600 mb-6">Click below to start your investigation</p>
-                  <button
-                    onClick={() => setCurrentNodeId(flowchart.startNodeId)}
-                    className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-bold text-lg"
-                  >
-                    Start Investigation
-                  </button>
-                </div>
-              )}
-
-              {/* Investigation Path History */}
-              {userPath.length > 0 && (
-                <div className="mt-8 pt-6 border-t">
-                  <h4 className="text-lg font-bold text-gray-800 mb-4">Your Investigation Path</h4>
-                  <div className="space-y-4">
-                    {userPath.map((step, index) => (
-                      <div key={index} className="bg-gray-50 p-4 rounded-lg">
-                        <p className="font-bold text-gray-800">{step.question}</p>
-                        <p className="text-gray-600 mt-2">
-                          Selected: {step.selectedTexts.join(', ')}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
+    if (!currentNode) {
+      return (
+        <div className="h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-purple-50 p-4">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold text-gray-800 mb-4">Investigation Complete!</h1>
+            <button
+              onClick={resetFlow}
+              className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition-colors"
+            >
+              Back to Admin
+            </button>
           </div>
         </div>
-      </>
+      );
+    }
+
+    if (currentNode.isEndpoint) {
+      return (
+        <div className="h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-blue-50 p-4">
+          <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8 text-center">
+            <div className="mb-6">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <span className="text-2xl">🎯</span>
+              </div>
+              <h2 className="text-2xl font-bold text-gray-800 mb-4">Investigation Result</h2>
+              <p className="text-gray-700 text-lg leading-relaxed">{currentNode.endpointMessage}</p>
+            </div>
+
+            {userPath.length > 0 && (
+              <div className="mb-6 p-4 bg-gray-50 rounded-lg overflow-y-auto max-h-60">
+                <h3 className="font-medium text-gray-800 mb-2">Your Investigation Path:</h3>
+                <div className="text-sm text-gray-600 space-y-1">
+                  {userPath.map((step, index) => (
+                    <div key={index} className="flex items-center justify-between">
+                      <span className="truncate">{step.question}</span>
+                      <span className="font-medium ml-2">{step.selectedTexts.join(', ')}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setCurrentNodeId(flowchart.startNodeId);
+                  setUserPath([]);
+                }}
+                className="flex-1 bg-blue-500 text-white px-4 py-3 rounded-lg hover:bg-blue-600 transition-colors flex items-center justify-center"
+              >
+                <RotateCcw className="w-4 h-4 mr-2" />
+                Start Over
+              </button>
+              <button
+                onClick={showPathVisualization}
+                className="flex-1 bg-purple-500 text-white px-4 py-3 rounded-lg hover:bg-purple-600 transition-colors flex items-center justify-center"
+              >
+                <Eye className="w-4 h-4 mr-2" />
+                View Path
+              </button>
+              <button
+                onClick={exportPath}
+                className="flex-1 bg-green-500 text-white px-4 py-3 rounded-lg hover:bg-green-600 transition-colors flex items-center justify-center"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Export Investigation
+              </button>
+            </div>
+            
+            <button
+              onClick={resetFlow}
+              className="w-full mt-3 bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors"
+            >
+              Back to Admin
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // Get the options as an array for dynamic rendering
+    const optionEntries = Object.entries(currentNode.options);
+
+    return (
+      <div className="h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-purple-50 p-4">
+        <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8">
+          {/* Progress indicator */}
+          <div className="mb-6">
+            <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
+              <span>Step {userPath.length + 1}</span>
+              <span>{currentNode.id}</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div 
+                className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                style={{ width: `${((userPath.length + 1) / Object.keys(flowchart.nodes).length) * 100}%` }}
+              ></div>
+            </div>
+          </div>
+
+          {/* Question */}
+          <div className="text-center mb-8">
+            <h2 className="text-2xl font-bold text-gray-800 mb-4">{currentNode.question}</h2>
+            {currentNode.selectionMode === 'multiple' && (
+              <div className="mb-4">
+                <div className="bg-purple-100 border border-purple-300 rounded-lg p-3 mb-4">
+                  <p className="text-purple-800 text-sm font-medium">
+                    📋 Multiple Selection Mode: You can select multiple options that apply to your situation
+                  </p>
+                </div>
+                {selectedOptions.length > 0 && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <p className="text-blue-800 text-sm font-medium mb-2">
+                      Selected ({selectedOptions.length}): 
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedOptions.map(optionKey => (
+                        <span key={optionKey} className="bg-blue-500 text-white px-2 py-1 rounded text-xs">
+                          {currentNode.options[optionKey].text}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Dynamic Options */}
+          <div className="space-y-4 max-h-[40vh] overflow-y-auto pr-2">
+            {optionEntries.map(([optionKey, option], index) => {
+              const isSelected = selectedOptions.includes(optionKey);
+              const isMultipleMode = currentNode.selectionMode === 'multiple';
+              
+              return (
+                <motion.button
+                  key={optionKey}
+                  whileHover={{ scale: 1.04 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => handleChoice(optionKey)}
+                  className={`w-full p-4 rounded-lg transition-all duration-200 transform flex items-center justify-between group ${
+                    isMultipleMode
+                      ? isSelected
+                        ? 'bg-purple-600 text-white border-2 border-purple-700'
+                        : 'bg-purple-500 text-white hover:bg-purple-600'
+                      : 'bg-blue-500 text-white hover:bg-blue-600'
+                  }`}
+                  style={{ 
+                    backgroundColor: !isMultipleMode ? (index % 2 === 0 ? '#3b82f6' : '#8b5cf6') : undefined
+                  }}
+                >
+                  <div className="flex items-center">
+                    {isMultipleMode && (
+                      <div className={`w-5 h-5 rounded border-2 mr-3 flex items-center justify-center ${
+                        isSelected ? 'bg-white border-white' : 'border-white'
+                      }`}>
+                        {isSelected && <span className="text-purple-600 text-sm">✓</span>}
+                      </div>
+                    )}
+                    <span className="font-medium">{option.text}</span>
+                  </div>
+                  {!isMultipleMode && (
+                    <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                  )}
+                </motion.button>
+              );
+            })}
+          </div>
+
+          {/* Continue Button for Multiple Selection */}
+          {currentNode.selectionMode === 'multiple' && (
+            <div className="mt-6">
+              <button
+                onClick={confirmMultipleSelection}
+                disabled={selectedOptions.length === 0}
+                className="w-full bg-green-500 text-white p-4 rounded-lg hover:bg-green-600 transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none font-bold"
+              >
+                Continue with Selected Options ({selectedOptions.length})
+              </button>
+              <p className="text-center text-gray-500 text-sm mt-2">
+                Select one or more options above, then click continue
+              </p>
+            </div>
+          )}
+
+          {/* Breadcrumb */}
+          {userPath.length > 0 && (
+            <div className="mt-6 p-4 bg-gray-50 rounded-lg overflow-y-auto max-h-40">
+              <h3 className="text-sm font-medium text-gray-700 mb-2">Your Investigation Journey:</h3>
+              <div className="space-y-2">
+                {userPath.map((step, index) => (
+                  <div key={index} className="flex flex-wrap gap-1">
+                    <span className="text-xs text-gray-600">Step {index + 1}:</span>
+                    {step.selectedTexts ? (
+                      // Multiple selection display
+                      step.selectedTexts.map((text, textIndex) => (
+                        <span
+                          key={textIndex}
+                          className={`px-2 py-1 rounded text-xs font-medium ${
+                            step.selectionMode === 'multiple' 
+                              ? 'bg-purple-100 text-purple-800' 
+                              : 'bg-blue-100 text-blue-800'
+                          }`}
+                        >
+                          {text}
+                        </span>
+                      ))
+                    ) : (
+                      // Legacy single selection display
+                      <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">
+                        {step.selectedTexts?.[0] || ''}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <button
+            onClick={resetFlow}
+            className="w-full mt-4 text-gray-500 hover:text-gray-700 transition-colors text-sm"
+          >
+            Back to Admin Panel
+          </button>
+        </div>
+      </div>
     );
   }
 
